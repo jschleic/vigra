@@ -5,7 +5,7 @@
 #include <vigra/convolution.hxx>
 #include <vigra/stdconvolution.hxx>
 
-#include "poissonSolver.hxx"
+#include <vigra/poissonsolver.hxx>
 
 // This can be used as usage example or as testcase
 // It loads an image given as commandline parameter
@@ -53,10 +53,11 @@ int main(int argc, char** argv) {
 
         vigra::Kernel2D<float> laplaceKernel = vigra::Kernel2DLaplace<float>();
         vigra::poissonInitUpwards(out, zielDiv, laplaceKernel, 33);
-        vigra::runMultigrid(out, zielDiv, laplaceKernel, 33, 1.7, 1.0);
+        vigra::runMultigrid(out, zielDiv, laplaceKernel, 33, 1.7, 1.);
 
         // Fehler berechnen
         double _error = poissonError(err, out, zielDiv, laplaceKernel);
+        // should(_error < 100.)
         std::cout << "Fehler (Residuumsquadrat): " << _error << std::endl;
 
 

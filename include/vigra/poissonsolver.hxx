@@ -48,28 +48,21 @@
 namespace vigra {
 /**
  * \addtogroup PDE-Solver Multigrid-Solver für Partielle Differentialgleichungen
- * 
+ *
  * \author Sven Ebser und Joachim Schleicher
  * \date Oktober 2009 - März 2010
- * 
+ *
  * \brief In diesem Projekt sollen partielle Differentialgleichungen,
  * hier speziell eine Poisson-Gleichung iterativ mit einem Multigrid-Ansatz gelöst werden.
- * 
- * Die effektive Lösung von Differentialgleichungen ist in vielen Bereichen der 
- * Bildverarbeitung von Bedeutung. In unserem Projekt ging es um die Komprimierung von 
+ *
+ * Die effektive Lösung von Differentialgleichungen ist in vielen Bereichen der
+ * Bildverarbeitung von Bedeutung. In unserem Projekt ging es um die Komprimierung von
  * HDR-Fotos zur Darstellung auf herkömmlichen 8-bit Ausgabegeräten.
- * 
- * Ein iterativer Ansatz zur Lösung der Poisson-Gleichung Δx = b ist der Algorithmus der 
- * Successive Over-Relaxation. Dieser Algorithmus wurde hier implementiert und 
- * zur Ausnutzung der Glättung hochfrequenter Anteile ein Multigrid-Code darauf aufbauend 
+ *
+ * Ein iterativer Ansatz zur Lösung der Poisson-Gleichung Δx = b ist der Algorithmus der
+ * Successive Over-Relaxation. Dieser Algorithmus wurde hier implementiert und
+ * zur Ausnutzung der Glättung hochfrequenter Anteile ein Multigrid-Code darauf aufbauend
  * geschrieben.
- * 
- * 
- * \file poissonSolver.hxx
- * \brief Enthält den SOR- und den Multigrid-Solver
- * 
- * Diese Datei enthält den kompletten Multigrid-Code und kann einfach inkludiert werden.
- * Als Beispielanwendung wird eine Funktion zur Integration eines Gradientenfeldes angeboten.
  */
 
 
@@ -89,15 +82,16 @@ public:
     }
 };
 
+namespace detail {
 // Berechnet das Kernel-Produkt von a_ij mit x zur Verwendung in der Summe
-// Mit Randueberpruefung
+// with border-checks (BORDER_TREATMENT_REFLECT)
 // internal use only
 template <class Image>
 inline typename Image::value_type a_ij_x_product(const int x0, const int y0, int dx, int dy, const Kernel2D<typename Image::value_type> & k, const Image& im) {
     int xj = x0+dx;
     int yj = y0+dy;
 
-    if(xj < 0 || xj >= im.width())  dx = -dx;   // Wenn wir links raus laufen, Spiegeln wir an der Kante
+    if(xj < 0 || xj >= im.width())  dx = -dx;   // boundary condition: mirror at left border
     if(yj < 0 || yj >= im.height())  dy = -dy;
 
     xj = x0+dx;
@@ -155,6 +149,8 @@ void reduceToNextLevel(Image & in, Image & out)
 
     transformImage(srcImageRange(out), destImage(out), functor::Param(4.)*functor::Arg1());
 }
+
+} // namespace detail
 
 /**
  * Konstruiert eine Gauß-Pyramide mit korrekter Skalierung:
@@ -296,7 +292,7 @@ void runMultigrid(Image& out, Image& gradient, const Kernel2D<typename Image::va
 
     poissonError(err, out, gradient, k);    // Fehler berechnen
 
-    reduceToNextLevel(err, err2);
+    detail::reduceToNextLevel(err, err2);
     runMultigrid(out2, err2, k, minLen, omega, errorThreshold);
     if(mode==MODE_W_CYCLE) {
         runMultigrid(out2, err2, k, minLen, omega, errorThreshold); // again: W-Cycle
@@ -341,14 +337,14 @@ void runSORSolver(Image& ziel, const Image& gradient, const Kernel2D<typename Im
         // dort gespiegelt werden muss
         for(int i = 0; i < width; i++) {    // erste Zeile
 
-            pixelType xnew = (1-omega)*ziel[0][i] + omega * (gradient[0][i] - stencil_sum(i,0,s,ziel))/s(0,0);
+            pixelType xnew = (1-omega)*ziel[0][i] + omega * (gradient[0][i] - detail::stencil_sum(i,0,s,ziel))/s(0,0);
             pixelType delta = ziel[0][i]-xnew;
             ziel[0][i] = xnew;
             error += delta*delta;
         }
         for(int y = 1; y < height-1; y++) { // Ueber das ganze Bild
             { // linker Rand
-                pixelType xnew = (1-omega)*ziel[y][0] + omega * (gradient[y][0] - stencil_sum(0,y,s,ziel))/s(0,0);
+                pixelType xnew = (1-omega)*ziel[y][0] + omega * (gradient[y][0] - detail::stencil_sum(0,y,s,ziel))/s(0,0);
                 pixelType delta = ziel[y][0]-xnew;
                 ziel[y][0] = xnew;
                 error += delta*delta;
@@ -368,7 +364,7 @@ void runSORSolver(Image& ziel, const Image& gradient, const Kernel2D<typename Im
                 ziel[y][x] = xnew;
             }
             { // rechter Rand
-                pixelType xnew = (1-omega)*ziel[y][width-1] + omega * (gradient[y][width-1] - stencil_sum(width-1,y,s,ziel))/s(0,0);
+                pixelType xnew = (1-omega)*ziel[y][width-1] + omega * (gradient[y][width-1] - detail::stencil_sum(width-1,y,s,ziel))/s(0,0);
                 pixelType delta = ziel[y][width-1]-xnew;
                 ziel[y][width-1] = xnew;
                 error += delta*delta;
@@ -376,7 +372,7 @@ void runSORSolver(Image& ziel, const Image& gradient, const Kernel2D<typename Im
         }
         for(int x = 0; x < width; x++) {    // letzte Zeile
 
-            pixelType xnew = (1-omega)*ziel[height-1][x] + omega * (gradient[height-1][x] - stencil_sum(x,height-1,s,ziel))/s(0,0);
+            pixelType xnew = (1-omega)*ziel[height-1][x] + omega * (gradient[height-1][x] - detail::stencil_sum(x,height-1,s,ziel))/s(0,0);
             pixelType delta = ziel[height-1][x]-xnew;
             ziel[height-1][x] = xnew;
             error += delta*delta;
